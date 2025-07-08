@@ -25,6 +25,17 @@ export const mapServiceFromApi = (apiService: any): IService => {
   };
 };
 
+// Interfaz para respuesta paginada
+export interface PaginatedResponse<T> {
+  data: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
 // Función para convertir respuesta de turno de ASP.NET a formato frontend
 export const mapTurnoFromApi = (apiTurno: any): ITurno => {
   return {
@@ -137,16 +148,152 @@ export const authApi = {
   },
 };
 
-// Funciones para otros endpoints (por implementar cuando sean necesarias)
+// API de servicios con funciones completas
 export const serviceApi = {
-  getAll: async (): Promise<IService[]> => {
-    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}`);
-    return response.map(mapServiceFromApi);
+  // Obtener servicios con paginación y filtros
+  getAll: async (options?: {
+    page?: number;
+    pageSize?: number;
+    tipo?: string;
+    search?: string;
+    includeInactive?: boolean;
+  }): Promise<PaginatedResponse<IService>> => {
+    const params = new URLSearchParams();
+    
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.pageSize) params.append('pageSize', options.pageSize.toString());
+    if (options?.tipo) params.append('tipo', options.tipo);
+    if (options?.search) params.append('search', options.search);
+    if (options?.includeInactive) params.append('includeInactive', 'true');
+
+    const url = `${process.env.NEXT_PUBLIC_API_SERVICE}?${params.toString()}`;
+    
+    // Para respuestas paginadas, necesitamos la respuesta completa, no solo data
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {})
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const fullResponse = await response.json();
+    
+    return {
+      data: fullResponse.data.map(mapServiceFromApi),
+      totalCount: fullResponse.totalCount,
+      page: fullResponse.page,
+      pageSize: fullResponse.pageSize,
+      totalPages: fullResponse.totalPages,
+      hasNext: fullResponse.hasNext,
+      hasPrevious: fullResponse.hasPrevious
+    };
   },
 
+  // Obtener todos los servicios sin paginación (para compatibilidad)
+  getAllSimple: async (): Promise<IService[]> => {
+    const url = `${process.env.NEXT_PUBLIC_API_SERVICE}?pageSize=100`;
+    
+    // Hacer fetch directo para depurar
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {})
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Respuesta completa de la API:', data);
+    
+    // La respuesta tiene estructura: { success, message, data: [...] }
+    if (!data.success) {
+      throw new Error(data.message || 'Error al obtener servicios');
+    }
+
+    if (!Array.isArray(data.data)) {
+      console.error('data.data no es un array:', data.data);
+      throw new Error('Respuesta de API inválida');
+    }
+
+    return data.data.map(mapServiceFromApi);
+  },
+
+  // Obtener servicio por ID
   getById: async (id: string): Promise<IService> => {
     const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}/${id}`);
     return mapServiceFromApi(response);
+  },
+
+  // Obtener servicio por nombre
+  getByName: async (nombre: string): Promise<IService> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}/name/${encodeURIComponent(nombre)}`);
+    return mapServiceFromApi(response);
+  },
+
+  // Crear nuevo servicio
+  create: async (serviceData: {
+    nombre: string;
+    image: string;
+    tipo?: string;
+    precio?: number;
+    descripcion?: string;
+  }): Promise<IService> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        nombre: serviceData.nombre,
+        image: serviceData.image,
+        tipo: serviceData.tipo,
+        precio: serviceData.precio,
+        descripcion: serviceData.descripcion
+      }),
+    });
+    return mapServiceFromApi(response);
+  },
+
+  // Actualizar servicio existente
+  update: async (id: string, serviceData: {
+    nombre?: string;
+    image?: string;
+    tipo?: string;
+    precio?: number;
+    descripcion?: string;
+    isActive?: boolean;
+  }): Promise<IService> => {
+    const updateData: any = {};
+    
+    if (serviceData.nombre !== undefined) updateData.nombre = serviceData.nombre;
+    if (serviceData.image !== undefined) updateData.image = serviceData.image;
+    if (serviceData.tipo !== undefined) updateData.tipo = serviceData.tipo;
+    if (serviceData.precio !== undefined) updateData.precio = serviceData.precio;
+    if (serviceData.descripcion !== undefined) updateData.descripcion = serviceData.descripcion;
+    if (serviceData.isActive !== undefined) updateData.isActive = serviceData.isActive;
+
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+    return mapServiceFromApi(response);
+  },
+
+  // Eliminar servicio (soft delete)
+  delete: async (id: string): Promise<void> => {
+    await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Obtener tipos de servicios únicos
+  getTypes: async (): Promise<string[]> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_SERVICE}/tipos`);
+    return response;
   },
 };
 
