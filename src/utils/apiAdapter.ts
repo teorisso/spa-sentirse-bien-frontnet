@@ -36,6 +36,15 @@ export interface PaginatedResponse<T> {
   hasPrevious: boolean;
 }
 
+// Tipo para manejar resultados de login sin excepciones
+export type LoginResult = {
+  success: true;
+  data: AuthResponse;
+} | {
+  success: false;
+  error: string;
+};
+
 // Función para convertir respuesta de turno de ASP.NET a formato frontend
 export const mapTurnoFromApi = (apiTurno: any): ITurno => {
   return {
@@ -111,12 +120,47 @@ export const apiRequest = async (
 
 // Funciones específicas para cada endpoint
 export const authApi = {
-  login: async (email: string, password: string): Promise<AuthResponse> => {
-    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_AUTH}/login`, {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-    return mapAuthFromApi(response);
+  login: async (email: string, password: string): Promise<LoginResult> => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_AUTH}/login`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      // En lugar de lanzar excepción, devolver objeto con el error
+      if (!response.ok) {
+        const errorMessage = data.message || data.errors?.join(', ') || `Error ${response.status}`;
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+
+      // Mapear la respuesta exitosa
+      const mappedResponse = data.data !== undefined ? data.data : data;
+      return {
+        success: true,
+        data: mapAuthFromApi(mappedResponse)
+      };
+    } catch (error) {
+      // Si hay error de red u otro error, devolver objeto con error
+      return {
+        success: false,
+        error: 'Error de conexión con el servidor'
+      };
+    }
   },
 
   register: async (userData: {

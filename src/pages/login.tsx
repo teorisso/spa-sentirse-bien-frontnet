@@ -9,7 +9,7 @@ import PageHero from '../components/PageHero';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import jwt_decode from 'jwt-decode';
 import UsuarioModal from '@/components/admin/UsuarioModal';
-import { authApi } from '@/utils/apiAdapter';
+import { authApi, LoginResult } from '@/utils/apiAdapter';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -42,26 +42,27 @@ export default function LoginPage() {
     setIsLoading(true);
     setMensaje(null);
 
-    try {
-      // Usar el adaptador para la nueva API ASP.NET
-      const authResponse = await authApi.login(email, password);
-      
-      // El adaptador ya mapea la respuesta al formato esperado
-      await login(authResponse.token, authResponse.user);
+    // Usar el nuevo patrón sin excepciones
+    const loginResult = await authApi.login(email, password);
+    
+    if (loginResult.success) {
+      // Login exitoso
+      await login(loginResult.data.token, loginResult.data.user);
       setMensaje('Inicio de sesión exitoso');
       setTipoMensaje('exito');
       
-      const userRole = authResponse.user.role;
+      const userRole = loginResult.data.user.role;
       setTimeout(() => {
         router.push('/'); // Todos los usuarios van a la página principal
       }, 1000);
-    } catch (error: any) {
-      console.error('Error en el inicio de sesión:', error);
-      setMensaje(error.message || 'Error de conexión con el servidor. Por favor, intente nuevamente.');
+    } else {
+      // Login falló - mostrar error sin lanzar excepción
+      console.error('Error en el inicio de sesión:', loginResult.error);
+      setMensaje(loginResult.error);
       setTipoMensaje('error');
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   }
 
   // Manejo del login con Google - TEMPORALMENTE DESHABILITADO
