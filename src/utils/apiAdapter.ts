@@ -298,13 +298,233 @@ export const serviceApi = {
 };
 
 export const turnoApi = {
-  getAll: async (): Promise<ITurno[]> => {
-    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}`);
-    return response.map(mapTurnoFromApi);
+  // Obtener turnos con filtros
+  getAll: async (filters?: {
+    clienteId?: string;
+    profesionalId?: string;
+    servicioId?: string;
+    estado?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedResponse<any>> => {
+    const params = new URLSearchParams();
+    
+    if (filters?.clienteId) params.append('clienteId', filters.clienteId);
+    if (filters?.profesionalId) params.append('profesionalId', filters.profesionalId);
+    if (filters?.servicioId) params.append('servicioId', filters.servicioId);
+    if (filters?.estado) params.append('estado', filters.estado);
+    if (filters?.fechaDesde) params.append('fechaDesde', filters.fechaDesde);
+    if (filters?.fechaHasta) params.append('fechaHasta', filters.fechaHasta);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
+
+    const url = `${process.env.NEXT_PUBLIC_API_TURNO}?${params.toString()}`;
+    const response = await apiRequest(url);
+    return response;
   },
 
-  getById: async (id: string): Promise<ITurno> => {
+  // Obtener turno por ID
+  getById: async (id: string): Promise<any> => {
     const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}/${id}`);
-    return mapTurnoFromApi(response);
+    return response;
+  },
+
+  // Crear nuevo turno
+  create: async (turnoData: {
+    clienteId: string;
+    servicioId: string;
+    profesionalId: string;
+    fecha: string;
+    hora: string;
+    notas?: string;
+  }): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        clienteId: turnoData.clienteId,
+        servicioId: turnoData.servicioId,
+        profesionalId: turnoData.profesionalId,
+        fecha: turnoData.fecha,
+        hora: turnoData.hora,
+        notas: turnoData.notas
+      }),
+    });
+    return response;
+  },
+
+  // Actualizar turno
+  update: async (id: string, updateData: {
+    profesionalId?: string;
+    fecha?: string;
+    hora?: string;
+    estado?: string;
+    notas?: string;
+    precioPagado?: number;
+  }): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+    return response;
+  },
+
+  // Cancelar turno
+  cancel: async (id: string): Promise<void> => {
+    await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Obtener disponibilidad
+  getDisponibilidad: async (profesionalId: string, fecha: string): Promise<string[]> => {
+    const params = new URLSearchParams();
+    params.append('profesionalId', profesionalId);
+    params.append('fecha', fecha);
+    
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}/disponibilidad?${params.toString()}`);
+    return response;
+  },
+};
+
+export const paymentApi = {
+  // Obtener pagos con filtros
+  getAll: async (filters?: {
+    clienteId?: string;
+    estado?: string;
+    metodoPago?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    montoMinimo?: number;
+    montoMaximo?: number;
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedResponse<any>> => {
+    const params = new URLSearchParams();
+    
+    if (filters?.clienteId) params.append('clienteId', filters.clienteId);
+    if (filters?.estado) params.append('estado', filters.estado);
+    if (filters?.metodoPago) params.append('metodoPago', filters.metodoPago);
+    if (filters?.fechaDesde) params.append('fechaDesde', filters.fechaDesde);
+    if (filters?.fechaHasta) params.append('fechaHasta', filters.fechaHasta);
+    if (filters?.montoMinimo) params.append('montoMinimo', filters.montoMinimo.toString());
+    if (filters?.montoMaximo) params.append('montoMaximo', filters.montoMaximo.toString());
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
+
+    const url = `${process.env.NEXT_PUBLIC_API_PAYMENT}?${params.toString()}`;
+    const response = await apiRequest(url);
+    return response;
+  },
+
+  // Obtener pago por ID
+  getById: async (id: string): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_PAYMENT}/${id}`);
+    return response;
+  },
+
+  // Crear nuevo pago
+  create: async (paymentData: {
+    turnoId: string;
+    monto: number;
+    metodoPago: string;
+    paymentDetails?: any;
+    notas?: string;
+  }): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_PAYMENT}`, {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+    return response;
+  },
+
+  // Procesar pago
+  process: async (paymentData: {
+    paymentId: string;
+    transactionId?: string;
+    authorizationCode?: string;
+    notas?: string;
+  }): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_PAYMENT}/process`, {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+    return response;
+  },
+
+  // Reembolsar pago
+  refund: async (id: string, motivo: string): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_PAYMENT}/${id}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ motivo }),
+    });
+    return response;
+  },
+
+  // Obtener estadísticas (solo admins)
+  getStats: async (fechaDesde?: string, fechaHasta?: string): Promise<any> => {
+    const params = new URLSearchParams();
+    if (fechaDesde) params.append('fechaDesde', fechaDesde);
+    if (fechaHasta) params.append('fechaHasta', fechaHasta);
+    
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_PAYMENT}/stats?${params.toString()}`);
+    return response;
+  },
+};
+
+export const qrApi = {
+  // Generar código QR
+  generate: async (qrData: {
+    action: string;
+    userId?: string;
+    turnoId?: string;
+    data?: Record<string, any>;
+    expirationMinutes?: number;
+  }): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_QR}/generate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: qrData.action,
+        userId: qrData.userId,
+        turnoId: qrData.turnoId,
+        data: qrData.data,
+        expirationMinutes: qrData.expirationMinutes || 60
+      }),
+    });
+    return response;
+  },
+
+  // Generar QR para check-in de turno
+  generateCheckin: async (turnoId: string): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_QR}/turno/${turnoId}/checkin`, {
+      method: 'POST',
+    });
+    return response;
+  },
+
+  // Obtener información de QR
+  getInfo: async (token: string): Promise<any> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_QR}/info/${token}`);
+    return response;
+  },
+
+  // Obtener historial de QRs (solo admins)
+  getHistory: async (filters?: {
+    page?: number;
+    pageSize?: number;
+    action?: string;
+    isUsed?: boolean;
+  }): Promise<PaginatedResponse<any>> => {
+    const params = new URLSearchParams();
+    
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
+    if (filters?.action) params.append('action', filters.action);
+    if (filters?.isUsed !== undefined) params.append('isUsed', filters.isUsed.toString());
+
+    const url = `${process.env.NEXT_PUBLIC_API_QR}/history?${params.toString()}`;
+    const response = await apiRequest(url);
+    return response;
   },
 }; 
