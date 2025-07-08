@@ -311,14 +311,15 @@ export const turnoApi = {
   }): Promise<PaginatedResponse<any>> => {
     const params = new URLSearchParams();
     
-    if (filters?.clienteId) params.append('clienteId', filters.clienteId);
-    if (filters?.profesionalId) params.append('profesionalId', filters.profesionalId);
-    if (filters?.servicioId) params.append('servicioId', filters.servicioId);
-    if (filters?.estado) params.append('estado', filters.estado);
-    if (filters?.fechaDesde) params.append('fechaDesde', filters.fechaDesde);
-    if (filters?.fechaHasta) params.append('fechaHasta', filters.fechaHasta);
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
+    // Usar PascalCase para los parámetros que espera el backend ASP.NET
+    if (filters?.clienteId) params.append('ClienteId', filters.clienteId);
+    if (filters?.profesionalId) params.append('ProfesionalId', filters.profesionalId);
+    if (filters?.servicioId) params.append('ServicioId', filters.servicioId);
+    if (filters?.estado) params.append('Estado', filters.estado);
+    if (filters?.fechaDesde) params.append('FechaDesde', filters.fechaDesde);
+    if (filters?.fechaHasta) params.append('FechaHasta', filters.fechaHasta);
+    if (filters?.page) params.append('Page', filters.page.toString());
+    if (filters?.pageSize) params.append('PageSize', filters.pageSize.toString());
 
     const url = `${process.env.NEXT_PUBLIC_API_TURNO}?${params.toString()}`;
     const response = await apiRequest(url);
@@ -340,16 +341,19 @@ export const turnoApi = {
     hora: string;
     notas?: string;
   }): Promise<any> => {
+    // Convertir a formato PascalCase que espera el backend ASP.NET
+    const createData = {
+      ClienteId: turnoData.clienteId,
+      ServicioId: turnoData.servicioId,
+      ProfesionalId: turnoData.profesionalId,
+      Fecha: turnoData.fecha,
+      Hora: turnoData.hora,
+      Notas: turnoData.notas
+    };
+
     const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_TURNO}`, {
       method: 'POST',
-      body: JSON.stringify({
-        clienteId: turnoData.clienteId,
-        servicioId: turnoData.servicioId,
-        profesionalId: turnoData.profesionalId,
-        fecha: turnoData.fecha,
-        hora: turnoData.hora,
-        notas: turnoData.notas
-      }),
+      body: JSON.stringify(createData),
     });
     return response;
   },
@@ -470,6 +474,54 @@ export const paymentApi = {
     
     const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_PAYMENT}/stats?${params.toString()}`);
     return response;
+  },
+};
+
+export const userApi = {
+  // Obtener todos los usuarios (solo admins)
+  getAll: async (role?: string): Promise<IUser[]> => {
+    const params = new URLSearchParams();
+    if (role) params.append('role', role);
+    
+    const url = `${process.env.NEXT_PUBLIC_API_USER}${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await apiRequest(url);
+    
+    if (Array.isArray(response)) {
+      return response.map(mapUserFromApi);
+    }
+    return [];
+  },
+
+  // Obtener profesionales específicamente
+  getProfesionales: async (): Promise<IUser[]> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_USER}/profesionales`);
+    
+    if (Array.isArray(response)) {
+      return response.map(mapUserFromApi);
+    }
+    return [];
+  },
+
+  // Obtener clientes (solo admins)
+  getClientes: async (): Promise<IUser[]> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_USER}/clientes`);
+    
+    if (Array.isArray(response)) {
+      return response.map(mapUserFromApi);
+    }
+    return [];
+  },
+
+  // Obtener usuario por ID
+  getById: async (id: string): Promise<IUser> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_USER}/${id}`);
+    return mapUserFromApi(response);
+  },
+
+  // Obtener perfil del usuario actual
+  getProfile: async (): Promise<IUser> => {
+    const response = await apiRequest(`${process.env.NEXT_PUBLIC_API_USER}/profile`);
+    return mapUserFromApi(response);
   },
 };
 

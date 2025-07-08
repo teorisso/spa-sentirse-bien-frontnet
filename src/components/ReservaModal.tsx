@@ -6,6 +6,7 @@ import { format, addDays, addHours, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
+import { serviceApi, turnoApi, userApi } from '@/utils/apiAdapter';
 import {
   IService,
   ITurnoPopulated,
@@ -74,19 +75,18 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
     fetchProfessionals();
     if (isAdmin) fetchClients();
     fetchExistingTurnos();
-  }, [isOpen]);
+  }, [isOpen, isAdmin]);
 
   /* fetch servicios */
   const fetchServices = async () => {
     try {
       setLoadingServices(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_SERVICE}`);
-      if (!res.ok) throw new Error('Error al cargar servicios');
-      const data = await res.json();
-      setServices(data);
+      const data = await serviceApi.getAllSimple();
+      setServices(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error('No se pudieron cargar los servicios');
-      console.error(err);
+      console.error('Error cargando servicios:', err);
+      setServices([]);
     } finally {
       setLoadingServices(false);
     }
@@ -96,13 +96,12 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
   const fetchProfessionals = async () => {
     try {
       setLoadingProfessionals(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_USER}`);
-      if (!res.ok) throw new Error('Error al cargar profesionales');
-      const data: IUser[] = await res.json();
-      setProfessionals(data.filter(u => u.role === 'profesional'));
+      const data = await userApi.getProfesionales();
+      setProfessionals(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error('No se pudieron cargar los profesionales');
-      console.error(err);
+      console.error('Error cargando profesionales:', err);
+      setProfessionals([]);
     } finally {
       setLoadingProfessionals(false);
     }
@@ -112,13 +111,12 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
   const fetchClients = async () => {
     try {
       setLoadingClients(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_USER}`);
-      if (!res.ok) throw new Error('Error al cargar clientes');
-      const data: IUser[] = await res.json();
-      setClients(data.filter(u => u.role === 'cliente'));
+      const data = await userApi.getClientes();
+      setClients(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error('No se pudieron cargar los clientes');
-      console.error(err);
+      console.error('Error cargando clientes:', err);
+      setClients([]);
     } finally {
       setLoadingClients(false);
     }
@@ -129,15 +127,16 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}?token=${token}`);
-      if (!res.ok) return;
-      const txt = await res.text();
-      try {
-        const data = JSON.parse(txt);
-        setExistingTurnos(data.filter((t: ITurnoPopulated) => t.estado !== 'cancelado'));
-      } catch {/* ignore */}
+      
+      const response = await turnoApi.getAll();
+      if (response && Array.isArray(response.data)) {
+        setExistingTurnos(response.data.filter((t: ITurnoPopulated) => t.estado !== 'cancelado'));
+      } else {
+        setExistingTurnos([]);
+      }
     } catch (err) {
-      console.error('Error cargando turnos existentes', err);
+      console.error('Error cargando turnos existentes:', err);
+      setExistingTurnos([]);
     }
   };
 
@@ -170,19 +169,19 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
     return availableTimes.filter(time => validateTurnoTime(selectedDate, time) && isTimeSlotOccupied(selectedDate, time, selectedService._id, selectedProfessional._id));
   };
 
-  const filteredClients = clients.filter(c => {
+  const filteredClients = Array.isArray(clients) ? clients.filter(c => {
     const full = `${c.first_name} ${c.last_name}`.toLowerCase();
     return full.includes(clientSearch.toLowerCase());
-  });
+  }) : [];
 
-  const filteredServices = services.filter(s => {
+  const filteredServices = Array.isArray(services) ? services.filter(s => {
     return s.nombre.toLowerCase().includes(serviceSearch.toLowerCase());
-  });
+  }) : [];
 
-  const filteredProfessionals = professionals.filter(p => {
+  const filteredProfessionals = Array.isArray(professionals) ? professionals.filter(p => {
     const full = `${p.first_name} ${p.last_name}`.toLowerCase();
     return full.includes(professionalSearch.toLowerCase());
-  });
+  }) : [];
 
   /* submit */
   const handleSubmit = async () => {
@@ -207,25 +206,22 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
         clienteId = user?._id || JSON.parse(localStorage.getItem('user') || '{}')._id;
       }
       if (!clienteId) throw new Error('No se encontró ID de usuario');
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No se encontró token');
 
-      const turnoData = { cliente: clienteId, servicio: selectedService._id, profesional: selectedProfessional._id, fecha: selectedDate.toISOString(), hora: selectedTime };
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}/create?token=${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(turnoData), signal: controller.signal });
-      clearTimeout(timeout);
-      const txt = await res.text();
-      if (res.headers.get('content-type')?.includes('text/html')) throw new Error('Respuesta inválida del servidor');
-      const data = txt ? JSON.parse(txt) : {};
-      if (!res.ok) throw new Error(data.message || 'Error del servidor');
+      const turnoData = {
+        clienteId: clienteId,
+        servicioId: selectedService._id,
+        profesionalId: selectedProfessional._id,
+        fecha: selectedDate.toISOString(),
+        hora: selectedTime
+      };
+
+      await turnoApi.create(turnoData);
       toast.success('Turno reservado con éxito');
       onSuccess();
       onClose();
     } catch (err: any) {
-      if (err.name === 'AbortError') setFormError('La solicitud tomó demasiado tiempo');
-      else setFormError(err.message || 'Error al reservar el turno');
-      console.error(err);
+      setFormError(err.message || 'Error al reservar el turno');
+      console.error('Error creando turno:', err);
     }
   };
 

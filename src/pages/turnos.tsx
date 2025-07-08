@@ -76,11 +76,12 @@ const TurnosPage = () => {
         return;
       }
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}?token=${token}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         cache: 'no-cache'
       });
@@ -244,11 +245,12 @@ const TurnosPage = () => {
       
       console.log('Enviando datos de cancelación:', turnoActualizado);
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}/edit/${turnoId}?token=${token}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}/${turnoId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(turnoActualizado)
       });
