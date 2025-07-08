@@ -430,7 +430,10 @@ export const paymentApi = {
 
   // Crear nuevo pago
   create: async (paymentData: {
-    turnoId: string;
+    // Soporte para múltiples turnos (nuevo)
+    turnosIds?: string[];
+    // Soporte para un solo turno (compatibilidad)
+    turnoId?: string;
     monto: number;
     metodoPago: string;
     paymentDetails?: any;

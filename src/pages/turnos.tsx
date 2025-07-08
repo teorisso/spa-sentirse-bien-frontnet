@@ -660,38 +660,24 @@ const TurnosPage = () => {
       const montoFinal = eligibleDescuento ? Math.round(total * 0.85) : total;
 
       try {
-        // Crear un pago por cada turno usando el paymentApi
-        for (const turno of turnosDia) {
-          // Aplicar descuento del 15% si es elegible
-          const montoFinalTurno = eligibleDescuento 
-            ? Math.round(turno.servicio.precio * 0.85)
-            : turno.servicio.precio;
+        // Crear UN SOLO pago para múltiples turnos (estructura nueva)
+        const pagoData = {
+          turnosIds: turnosDia.map(turno => turno._id), // Array de IDs de turnos
+          monto: montoFinal,
+          metodoPago: 'débito',
+          notas: `Pago con débito${eligibleDescuento ? ' con descuento del 15%' : ''} - ${turnosDia.length} turno(s)`
+        };
 
-          const pagoData = {
-            turnoId: turno._id,
-            monto: montoFinalTurno,
-            metodoPago: 'débito',
-            notas: `Pago con débito${eligibleDescuento ? ' con descuento del 15%' : ''}`
-          };
+        console.log('Enviando pago agrupado:', pagoData);
+        await paymentApi.create(pagoData);
 
-          await paymentApi.create(pagoData);
-        }
+        toast.success(`Pago con débito registrado exitosamente para ${turnosDia.length} turno(s)`);
 
-        toast.success('Pago con débito registrado y turnos confirmados');
-
-        // Actualización optimista del estado local
-        setTurnos((prev) =>
-          prev.map((t) =>
-            turnosDia.find((pd) => pd._id === t._id)
-              ? { ...t, estado: 'confirmado' as const }
-              : t
-          )
-        );
-
-        // Refrescar desde el servidor para mantener consistencia
+        // ✅ El backend ya marca los turnos como confirmado automáticamente
+        // Solo necesitamos refrescar desde el servidor
         fetchTurnos();
       } catch (err) {
-        console.error(err);
+        console.error('Error al crear pago agrupado:', err);
         toast.error('Error al confirmar el pago');
       }
     },
