@@ -11,7 +11,7 @@ import { toast } from 'react-hot-toast';
 import { ITurnoPopulated } from '@/types';
 import ReservaModal from '@/components/ReservaModal';
 import PagoDebitoModal from '@/components/PagoDebitoModal';
-import { turnoApi } from '@/utils/apiAdapter';
+import { turnoApi, paymentApi } from '@/utils/apiAdapter';
 import dynamic from 'next/dynamic';
 import { FileText, CreditCard, Wallet, Printer } from 'lucide-react';
 
@@ -660,24 +660,21 @@ const TurnosPage = () => {
       const montoFinal = eligibleDescuento ? Math.round(total * 0.85) : total;
 
       try {
-        const pagoBody = {
-          turnos: turnosDia.map((t) => t._id),
-          amount: montoFinal,
-          cliente: user?._id,
-        };
+        // Crear un pago por cada turno usando el paymentApi
+        for (const turno of turnosDia) {
+          // Aplicar descuento del 15% si es elegible
+          const montoFinalTurno = eligibleDescuento 
+            ? Math.round(turno.servicio.precio * 0.85)
+            : turno.servicio.precio;
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_PAYMENT}/create?token=${token}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify(pagoBody),
-        });
+          const pagoData = {
+            turnoId: turno._id,
+            monto: montoFinalTurno,
+            metodoPago: 'débito',
+            notas: `Pago con débito${eligibleDescuento ? ' con descuento del 15%' : ''}`
+          };
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Error ${res.status}: ${text || 'registrando pago'}`);
+          await paymentApi.create(pagoData);
         }
 
         toast.success('Pago con débito registrado y turnos confirmados');
