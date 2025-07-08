@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri&family=Roboto&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-gray-50;
+    }
+}
+
+@layer components {
+    .btn {
+        @apply px-4 py-2 rounded-md font-medium transition-colors;
+    }
+
+    .btn-primary {
+        @apply bg-blue-500 text-white hover:bg-blue-600;
+    }
+
+    .btn-secondary {
+        @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+    }
+
+    .btn-danger {
+        @apply bg-red-500 text-white hover:bg-red-600;
+    }
+
+    .input {
+        @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    }
+
+    .label {
+        @apply block text-sm font-medium text-gray-700;
+    }
+
+    .error {
+        @apply mt-2 text-sm text-red-600;
+    }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Estilos para react-day-picker */
+.rdp-day_selected {
+  background-color: #7D8C88 !important;
+  color: white !important;
+  font-weight: bold !important;
+}
+
+.rdp-day_selected:hover {
+  background-color: #6B7A76 !important;
+}
+
+.rdp-day_selected:focus {
+  background-color: #7D8C88 !important;
+  outline: 2px solid #7D8C88 !important;
+}

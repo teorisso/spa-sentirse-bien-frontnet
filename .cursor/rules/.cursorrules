@@ -1,0 +1,42 @@
+# Reglas para el Proyecto SPA Sentirse Bien
+
+## Estructura y Organización
+- Mantener separación clara entre frontend y backend
+- Seguir la estructura de carpetas establecida en ambos proyectos
+- Mantener los componentes React en la carpeta src/components
+- Mantener las rutas API en la carpeta routes del backend
+
+## Convenciones de Código
+- Usar TypeScript para todo el código
+- Seguir las convenciones de nombrado de Next.js para el frontend
+- Implementar interfaces TypeScript para todos los modelos de datos
+- Documentar todas las funciones y componentes principales
+
+## Metodología de Trabajo
+- **Verificar antes de actuar:** Antes de afirmar que una funcionalidad falta o está incompleta, revisar exhaustivamente el código base (componentes, modales, rutas, modelos y lógica de negocio). La precisión y la verificación son más importantes que la velocidad. Evitar inferencias basadas solo en la estructura de archivos o nombres de carpetas.
+
+## Frontend
+- Usar TailwindCSS para todos los estilos
+- Implementar componentes reutilizables
+- Seguir las mejores prácticas de accesibilidad
+- Usar Framer Motion para animaciones
+- Implementar validación de formularios con React Hook Form y Zod
+
+## Backend
+- Implementar autenticación JWT
+- Validar todos los inputs del usuario
+- Sanitizar datos antes de guardarlos
+- Manejar errores de forma segura
+- Usar async/await para operaciones asíncronas
+
+## Testing
+- Escribir pruebas unitarias para funciones críticas
+- Implementar pruebas de integración para flujos principales
+- Validar funcionalidad en diferentes dispositivos
+- Probar escenarios de error y casos límite
+
+## Despliegue
+- Configurar variables de entorno para diferentes ambientes
+- Asegurar que la aplicación sea desplegable en una URL pública
+- Mantener configuración de Vercel actualizada
+- Documentar proceso de despliegue

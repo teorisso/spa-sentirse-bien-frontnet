@@ -1,0 +1,111 @@
+# Reglas para el Proyecto SPA Sentirse Bien
+
+## Estructura y Organización
+- Mantener separación clara entre frontend y backend
+- Seguir la estructura de carpetas establecida en ambos proyectos
+- Mantener los componentes React en la carpeta src/components
+- Mantener las rutas API en la carpeta routes del backend
+
+## Convenciones de Código
+- Usar TypeScript para todo el código
+- Seguir las convenciones de nombrado de Next.js para el frontend
+- Implementar interfaces TypeScript para todos los modelos de datos
+- Documentar todas las funciones y componentes principales
+
+## Seguridad
+- Implementar autenticación JWT para todas las rutas protegidas
+- Validar todos los inputs del usuario
+- Sanitizar datos antes de guardarlos en la base de datos
+- Manejar errores de forma segura sin exponer información sensible
+
+## Funcionalidades Críticas
+- Implementar sistema de roles (Cliente, Profesional, Administrador)
+- Asegurar validación de horarios para reservas (48h antes)
+- Implementar sistema de descuentos (15% para pagos anticipados)
+- Garantizar persistencia inmediata en base de datos
+
+## UI/UX
+- Seguir la paleta de colores corporativa (3-4 colores)
+- Implementar diseño responsive para todos los componentes
+- Mantener tiempos de carga inferiores a 1 segundo
+- Incluir mensajes de error y confirmación claros
+
+## Integración
+- Implementar sistema de pagos con tarjeta de débito
+- Configurar sistema de notificaciones por email
+- Asegurar sincronización en tiempo real de reservas
+- Mantener consistencia entre frontend y backend
+
+## Testing
+- Escribir pruebas unitarias para funciones críticas
+- Implementar pruebas de integración para flujos principales
+- Validar funcionalidad en diferentes dispositivos
+- Probar escenarios de error y casos límite
+
+## Despliegue
+- Configurar variables de entorno para diferentes ambientes
+- Asegurar que la aplicación sea desplegable en una URL pública
+- Mantener configuración de Vercel actualizada
+- Documentar proceso de despliegue
+
+## Documentación
+- Mantener README actualizado con instrucciones de instalación
+- Documentar APIs con ejemplos de uso
+- Incluir comentarios en código complejo
+- Mantener documentación de arquitectura actualizada
+
+# Requerimientos Funcionales del Sistema
+
+Esta es la lista de requerimientos funcionales que deben ser implementados. Utiliza esta lista como la fuente de verdad para el desarrollo.
+
+**Nota Importante:** La implementación debe ser sencilla y funcionar con lo mínimo e indispensable, dado que es un proyecto universitario con tiempo limitado. Se debe priorizar la funcionalidad básica sobre características complejas.
+
+---
+
+### **Gestión y Administración**
+
+- **RF-1. Gestión de usuarios y roles:** Soporte para tres tipos de usuario (Cliente, Profesional, Administrador) con permisos diferenciados.
+- **RF-2. Registro y autenticación:** Registro e inicio de sesión seguro para cada rol.
+- **RF-3. Gestión de servicios:** Administrador puede crear/editar/eliminar servicios (nombre, categoría, descripción, imagen).
+- **RF-4. Programación de turnos:** Administrador asigna horarios y profesionales a cada servicio.
+- **RF-14. Perfil del Administrador:** Administrador puede dar de alta/baja usuarios y gestionar sus roles.
+
+### **Flujo del Cliente**
+
+- **RF-5. Reserva de turnos online:** Clientes reservan hasta 48 h antes; confirmación en tiempo real.
+- **RF-6. Integración de pagos:** Pago con tarjeta de débito, con 15% de descuento si se paga > 48h antes. Pagos agrupados por día para múltiples servicios.
+    - **Criterios de Aceptación:**
+        - El usuario puede introducir datos válidos de tarjeta de débito en un formulario seguro.
+        - El sistema valida si a la reserva le corresponde el descuento del 15% y lo aplica al total.
+        - La transacción debe proporcionar un feedback claro de éxito o error al usuario.
+        - Un pago exitoso se debe registrar en la base de datos, asociándolo al turno correspondiente.
+        - Si se reservan múltiples servicios para el mismo día, se debe generar un único cobro por el total.
+- **RF-7. Notificaciones por email:** Envío automático de comprobante de pago.
+- **RF-15. ChatBot en página de inicio:** Integrar un ChatBot para atención y orientación automática.
+
+### **Flujo del Profesional**
+
+- **RF-8. Consulta e impresión de agenda:** Profesionales consultan e imprimen su agenda diaria.
+- **RF-13. Perfil del Profesional:**
+    - Ver turnos del día.
+    - Registrar en el historial del cliente el tratamiento realizado.
+    - Consultar el historial completo de cada cliente.
+
+### **Requerimientos Generales y Reportes**
+
+- **RF-9. Reportes y listados:**
+    - Listado de turnos por día agrupados por servicio.
+    - Reporte de montos totales pagados por servicio y por profesional en un rango de fechas.
+- **RF-10. Persistencia en base de datos:** Todas las operaciones impactan inmediatamente en la base de datos.
+- **RF-11. Validación y mensajes:** Feedback claro de errores y confirmaciones para el usuario.
+- **RF-12. Despliegue:** La aplicación debe estar operativa en una URL pública.
+
+---
+
+### **Requerimientos No Funcionales**
+
+- **Usabilidad:** Navegación amigable e intuitiva.
+- **Interfaz y estilo:** Diseño coherente con la imagen corporativa.
+- **Responsive Design:** Adaptación completa a dispositivos móviles.
+- **Rendimiento:** Tiempo de respuesta de páginas críticas inferior a 1 s.
+- **Seguridad:** Cifrado de datos sensibles.
