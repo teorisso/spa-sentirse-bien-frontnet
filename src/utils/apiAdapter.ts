@@ -95,23 +95,38 @@ export const apiRequest = async (
       },
     });
 
-    const data = await response.json();
+    // ────────────────────────────────────────────────
+    // Parseo defensivo según Content-Type
+    // ────────────────────────────────────────────────
+    const contentType = response.headers.get('content-type') ?? '';
+    let payload: any = null;
 
-    if (!response.ok) {
-      // Si la API ASP.NET devuelve un error estructurado
-      if (data.message) {
-        throw new Error(data.message);
+    if (contentType.includes('application/json')) {
+      try {
+        payload = await response.json();
+      } catch {
+        // Body vacío o JSON corrupto
+        payload = null;
       }
-      // Si devuelve errores como array
-      if (data.errors && Array.isArray(data.errors)) {
-        throw new Error(data.errors.join(', '));
-      }
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    } else {
+      // Texto plano o sin cuerpo
+      payload = await response.text();
     }
 
-    // La API ASP.NET envuelve las respuestas en { success, message, data }
-    // Pero algunas respuestas pueden ser directas
-    return data.data !== undefined ? data.data : data;
+    if (!response.ok) {
+      if (payload && typeof payload === 'object') {
+        if (payload.message) throw new Error(payload.message);
+        if (Array.isArray(payload.errors)) throw new Error(payload.errors.join(', '));
+      }
+      throw new Error(`Error ${response.status}: ${response.statusText}${typeof payload === 'string' ? ` – ${payload}` : ''}`);
+    }
+
+    // Si el backend usa forma { success, message, data }
+    if (payload && typeof payload === 'object' && 'data' in payload) {
+      return (payload as any).data;
+    }
+
+    return payload;
   } catch (error) {
     console.error('API Request Error:', error);
     throw error;

@@ -211,7 +211,7 @@ export default function ReservaModal({ isOpen, onClose, onSuccess }: ReservaModa
         clienteId: clienteId,
         servicioId: selectedService._id,
         profesionalId: selectedProfessional._id,
-        fecha: selectedDate.toISOString(),
+        fecha: selectedDate.toISOString().split('T')[0],
         hora: selectedTime
       };
 
