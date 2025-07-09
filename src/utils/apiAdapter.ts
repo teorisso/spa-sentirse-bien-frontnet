@@ -190,6 +190,39 @@ export const authApi = {
       body: JSON.stringify({ token, newPassword }),
     });
   },
+
+  googleAuth: async (idToken: string): Promise<LoginResult> => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_AUTH}/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data.message || data.errors?.join(', ') || `Error ${response.status}`;
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+
+      const mappedResponse = data.data !== undefined ? data.data : data;
+      return {
+        success: true,
+        data: mapAuthFromApi(mappedResponse)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Error de conexión con el servidor'
+      };
+    }
+  },
 };
 
 // API de servicios con funciones completas

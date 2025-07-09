@@ -65,39 +65,42 @@ export default function LoginPage() {
     setIsLoading(false);
   }
 
-  // Manejo del login con Google - TEMPORALMENTE DESHABILITADO
+  // Manejo del login con Google
   async function handleGoogleLogin(cred: CredentialResponse) {
-    setMensaje('Google Login temporalmente no disponible. Use email y contraseña.');
-    setTipoMensaje('error');
-    
-    /* TODO: Implementar Google OAuth en la API ASP.NET
+    if (!cred.credential) {
+      setMensaje('Error al obtener credenciales de Google');
+      setTipoMensaje('error');
+      return;
+    }
+
+    setIsLoading(true);
+    setMensaje(null);
+
     try {
-      if (!cred.credential) return;
-
-      // Podemos decodificar el id_token si quisiéramos información extra
-
-      // 2. Enviamos el id_token al backend para validarlo / crear usuario
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_AUTH}/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_token: cred.credential }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        await login(data.token, data.user);
-        router.push('/');
+      // Enviar el id_token al backend para validarlo
+      const loginResult = await authApi.googleAuth(cred.credential);
+      
+      if (loginResult.success) {
+        // Login exitoso
+        await login(loginResult.data.token, loginResult.data.user);
+        setMensaje('Inicio de sesión con Google exitoso');
+        setTipoMensaje('exito');
+        
+        setTimeout(() => {
+          router.push('/'); // Redirigir a la página principal
+        }, 1000);
       } else {
-        setMensaje(data.message || 'Error con Google Login');
+        // Login falló
+        setMensaje(loginResult.error);
         setTipoMensaje('error');
       }
     } catch (error: any) {
       console.error('Google login error', error);
       setMensaje('Error interno de Google Login');
       setTipoMensaje('error');
+    } finally {
+      setIsLoading(false);
     }
-    */
   }
 
   return (
@@ -143,6 +146,14 @@ export default function LoginPage() {
                 className="w-full p-3 rounded-md border border-[#B6D5C8] focus:outline-none focus:ring-2 focus:ring-[#436E6C]"
                 required
               />
+              <div className="text-right mt-1">
+                <Link 
+                  href="/recuperar-password"
+                  className="text-xs text-[#436E6C] hover:text-[#5A9A98] transition-colors duration-300 underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
             </div>
 
             <button
