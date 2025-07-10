@@ -11,6 +11,7 @@ import { toast } from 'react-hot-toast';
 import { ITurnoPopulated } from '@/types';
 import ReservaModal from '@/components/ReservaModal';
 import PagoDebitoModal from '@/components/PagoDebitoModal';
+import { turnoApi, paymentApi } from '@/utils/apiAdapter';
 import dynamic from 'next/dynamic';
 import { FileText, CreditCard, Wallet, Printer } from 'lucide-react';
 
@@ -64,8 +65,6 @@ const TurnosPage = () => {
       return;
     }
     
-    const timeout = 15000;
-    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -76,111 +75,67 @@ const TurnosPage = () => {
         return;
       }
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}?token=${token}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        cache: 'no-cache'
+      // Usar turnoApi en lugar de fetch directo y filtrar por cliente actual
+      const response = await turnoApi.getAll({ 
+        clienteId: user._id,
+        pageSize: 100 // Obtener suficientes turnos para mostrar
       });
       
-      console.log('Response status:', res.status);
+      console.log('Turnos response para cliente', user._id, ':', response);
       
-      const contentType = res.headers.get('content-type');
-      console.log('Content-Type:', contentType);
-      
-      const responseText = await res.text();
-      console.log('Response body preview:', responseText.substring(0, 200));
-      
-      if (contentType && contentType.includes('text/html')) {
-        console.error('Server returned HTML instead of JSON. HTML preview:', responseText.substring(0, 300));
-        
-        if (responseText.includes('application is starting') || 
-            responseText.includes('building')) {
-          throw new Error('El servidor está iniciando. Por favor espera unos momentos e intenta nuevamente.');
-        }
-        
-        if (responseText.includes('login') || responseText.includes('unauthorized') ||
-            responseText.includes('not authorized')) {
-          localStorage.removeItem('token');
-          toast.error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-          router.push('/login');
-          return;
-        }
-        
-        throw new Error('El servidor devolvió HTML en lugar de JSON. Posible problema de autenticación.');
+      // Verificar si la respuesta viene directamente como array o con estructura data
+      let turnosArray = [];
+      if (Array.isArray(response)) {
+        turnosArray = response;
+      } else if (response && Array.isArray(response.data)) {
+        turnosArray = response.data;
       }
       
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Error parsing JSON:', parseError);
-        throw new Error('La respuesta del servidor no es un JSON válido');
-      }
+      console.log('Turnos array a procesar:', turnosArray);
       
-      if (!res.ok) {
-        throw new Error(data.message || `Error del servidor: ${res.status}`);
-      }
-      
-      if (Array.isArray(data)) {
-        const userTurnos = data.filter(turno => 
-          turno.cliente === user._id || 
-          turno.cliente?._id === user._id
-        );
-
-        // Enriquecer con profesionales si vienen sin poblar
-        const profesIdsFaltantes = userTurnos
-          .filter(t => typeof t.profesional === 'string')
-          .map(t => t.profesional as string);
-        const uniqueIds = Array.from(new Set(profesIdsFaltantes));
-
-        if (uniqueIds.length) {
-          try {
-            const resProfs = await fetch(`${process.env.NEXT_PUBLIC_API_USER}`);
-            if (resProfs.ok) {
-              const allUsers = await resProfs.json();
-              const profMap: Record<string, any> = {};
-              allUsers.forEach((u: any) => {
-                profMap[u._id] = u;
-              });
-              userTurnos.forEach(t => {
-                if (typeof t.profesional === 'string' && profMap[t.profesional]) {
-                  (t as any).profesional = profMap[t.profesional];
-                }
-                if (typeof t.profesional === 'string') {
-                  (t as any).profesional = null;
-                }
-              });
-            }
-          } catch {}
-        }
-        setTurnos(userTurnos);
+      if (turnosArray.length > 0) {
+        // Mapear los turnos al formato esperado por el frontend
+        const mappedTurnos = turnosArray.map((turno: any) => {
+          console.log('Procesando turno:', turno);
+          return {
+            _id: turno.id,
+            cliente: turno.cliente || { _id: turno.clienteId },
+            servicio: turno.servicio ? {
+              _id: turno.servicio.id,
+              nombre: turno.servicio.nombre,
+              Image: turno.servicio.image,
+              tipo: turno.servicio.tipo,
+              precio: turno.servicio.precio,
+              descripcion: turno.servicio.descripcion
+            } : { _id: turno.servicioId, nombre: 'Cargando...', Image: '', tipo: '', precio: 0, descripcion: '' },
+            profesional: turno.profesional ? {
+              _id: turno.profesional.id,
+              first_name: turno.profesional.firstName,
+              last_name: turno.profesional.lastName,
+              email: turno.profesional.email,
+              role: turno.profesional.role
+            } : { _id: turno.profesionalId, first_name: 'Sin', last_name: 'asignar', email: '', role: 'profesional' as const },
+            fecha: new Date(turno.fecha),
+            hora: turno.hora,
+            estado: turno.estado,
+            created_at: turno.createdAt ? new Date(turno.createdAt) : new Date(),
+            notas: turno.notas,
+            precio_pagado: turno.precioPagado
+          };
+        });
+        
+        console.log('Turnos mapeados:', mappedTurnos);
+        setTurnos(mappedTurnos);
       } else {
+        console.log('No hay turnos para mostrar');
         setTurnos([]);
       }
       setLoading(false);
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log(`Request timed out after ${timeout / 1000} seconds`);
-        if (retryCount < maxRetries) {
-          console.log('Timeout occurred, trying again...');
-          toast.loading(`El servidor está tardando en responder. Reintentando automáticamente...`);
-          
-          setTimeout(() => {
-            toast.dismiss();
-            fetchTurnos(retryCount + 1, maxRetries);
-          }, 1000);
-          return;
-        }
-        error = new Error('La solicitud tomó demasiado tiempo y fue cancelada después de varios intentos');
-      }
-
-      console.error('Full error:', error);
+      console.error('Error fetching turnos:', error);
       
-      if ((error instanceof TypeError && error.message.includes('Failed to fetch')) && 
-          retryCount < maxRetries) {
+      if (retryCount < maxRetries && 
+          (error instanceof TypeError && error.message.includes('Failed to fetch'))) {
         
         toast.loading(`El servidor parece estar iniciando. Reintentando en ${(retryCount + 1) * 5} segundos...`);
         
@@ -194,14 +149,19 @@ const TurnosPage = () => {
       }
       
       let errorMessage = 'No se pudieron cargar tus turnos';
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        errorMessage = 'No se pudo conectar con el servidor. El servidor puede estar iniciando o inactivo. Por favor, inténtalo de nuevo en unos momentos.';
-      } else if (error instanceof Error) {
+      if (error instanceof Error) {
         errorMessage = error.message;
-      }
-      
-      if (error instanceof TypeError && error.message.includes('blocked by CORS policy')) {
-        errorMessage = 'Error de permisos CORS. Contacta al administrador del sistema.';
+        
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'No se pudo conectar con el servidor. El servidor puede estar iniciando o inactivo. Por favor, inténtalo de nuevo en unos momentos.';
+        } else if (error.message.includes('401') || error.message.includes('unauthorized')) {
+          errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.';
+          localStorage.removeItem('token');
+          router.push('/login');
+          return;
+        } else if (error.message.includes('blocked by CORS policy')) {
+          errorMessage = 'Error de permisos CORS. Contacta al administrador del sistema.';
+        }
       }
       
       toast.error(errorMessage);
@@ -209,6 +169,8 @@ const TurnosPage = () => {
       setLoading(false);
     }
   };
+
+
 
   const handleCancelTurno = async (turnoId: string) => {
     if (!confirm('¿Estás seguro de que deseas cancelar este turno?')) return;
@@ -244,11 +206,12 @@ const TurnosPage = () => {
       
       console.log('Enviando datos de cancelación:', turnoActualizado);
       
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}/edit/${turnoId}?token=${token}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_TURNO}/${turnoId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(turnoActualizado)
       });
@@ -697,41 +660,24 @@ const TurnosPage = () => {
       const montoFinal = eligibleDescuento ? Math.round(total * 0.85) : total;
 
       try {
-        const pagoBody = {
-          turnos: turnosDia.map((t) => t._id),
-          amount: montoFinal,
-          cliente: user?._id,
+        // Crear UN SOLO pago para múltiples turnos (estructura nueva)
+        const pagoData = {
+          turnosIds: turnosDia.map(turno => turno._id), // Array de IDs de turnos
+          monto: montoFinal,
+          metodoPago: 'débito',
+          notas: `Pago con débito${eligibleDescuento ? ' con descuento del 15%' : ''} - ${turnosDia.length} turno(s)`
         };
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_PAYMENT}/create?token=${token}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify(pagoBody),
-        });
+        console.log('Enviando pago agrupado:', pagoData);
+        await paymentApi.create(pagoData);
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Error ${res.status}: ${text || 'registrando pago'}`);
-        }
+        toast.success(`Pago con débito registrado exitosamente para ${turnosDia.length} turno(s)`);
 
-        toast.success('Pago con débito registrado y turnos confirmados');
-
-        // Actualización optimista del estado local
-        setTurnos((prev) =>
-          prev.map((t) =>
-            turnosDia.find((pd) => pd._id === t._id)
-              ? { ...t, estado: 'confirmado' as const }
-              : t
-          )
-        );
-
-        // Refrescar desde el servidor para mantener consistencia
+        // ✅ El backend ya marca los turnos como confirmado automáticamente
+        // Solo necesitamos refrescar desde el servidor
         fetchTurnos();
       } catch (err) {
-        console.error(err);
+        console.error('Error al crear pago agrupado:', err);
         toast.error('Error al confirmar el pago');
       }
     },

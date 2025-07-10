@@ -10,12 +10,13 @@ import ReservaModal from '@/components/ReservaModal'; // Import ReservaModal
 import { toast } from 'react-hot-toast'; // Import toast
 import { useRouter } from 'next/router'; // Import useRouter
 import { Plus } from 'lucide-react'; // Import Plus icon
+import { serviceApi } from '@/utils/apiAdapter'; // Import serviceApi
 
 export default function ServiciosPage() {
   const [services, setServices] = useState<IService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rawData, setRawData] = useState(null);
+  const [rawData, setRawData] = useState<any>(null);
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const router = useRouter(); // Initialize useRouter
@@ -31,17 +32,9 @@ export default function ServiciosPage() {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_SERVICE}`);
-        if (!res.ok) {
-          const errorData = await res.text();
-          try {
-            const parsedError = JSON.parse(errorData);
-            throw new Error(parsedError.message || 'Error al cargar servicios');
-          } catch (e) {
-            throw new Error(errorData || 'Error al cargar servicios');
-          }
-        }
-        const data = await res.json();
+        // Usar el apiAdapter en lugar de fetch directo
+        const data = await serviceApi.getAllSimple();
+        console.log('Servicios obtenidos desde API:', data);
         setServices(data);
         setRawData(data); // Store raw data for debugging
       } catch (err) {
@@ -65,17 +58,8 @@ export default function ServiciosPage() {
     if (!isAdmin || !confirm('¿Estás seguro de que deseas eliminar este servicio?')) return;
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVICE}/delete/${id}?token=${token}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar el servicio');
-      }
+      // Usar el apiAdapter para eliminar
+      await serviceApi.delete(id);
       toast.success('Servicio eliminado con éxito');
       setServices(services.filter(s => s._id !== id));
     } catch (err) {
@@ -86,30 +70,34 @@ export default function ServiciosPage() {
 
   const handleSaveService = async (serviceData: Omit<IService, '_id' | 'Image'> & { Image?: string }) => {
     if (!isAdmin) return;
-    const method = selectedService ? 'PUT' : 'POST';
-    const url = selectedService
-      ? `${process.env.NEXT_PUBLIC_API_SERVICE}/edit/${selectedService._id}`
-      : `${process.env.NEXT_PUBLIC_API_SERVICE}/create`;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${url}?token=${token}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(serviceData),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al guardar el servicio');
-      }
-      const savedService = await response.json();
+      let savedService: IService;
+      
       if (selectedService) {
+        // Actualizar servicio existente
+        savedService = await serviceApi.update(selectedService._id, {
+          nombre: serviceData.nombre,
+          image: serviceData.Image || '',
+          tipo: serviceData.tipo,
+          precio: serviceData.precio,
+          descripcion: serviceData.descripcion
+        });
         setServices(services.map(s => (s._id === savedService._id ? savedService : s)));
         toast.success('Servicio actualizado con éxito');
       } else {
+        // Crear nuevo servicio
+        savedService = await serviceApi.create({
+          nombre: serviceData.nombre,
+          image: serviceData.Image || '',
+          tipo: serviceData.tipo,
+          precio: serviceData.precio,
+          descripcion: serviceData.descripcion
+        });
         setServices([...services, savedService]);
         toast.success('Servicio creado con éxito');
       }
+      
       setIsModalOpen(false);
       setSelectedService(null);
     } catch (err) {

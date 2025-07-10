@@ -9,7 +9,7 @@ import PageHero from '../components/PageHero';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import jwt_decode from 'jwt-decode';
 import UsuarioModal from '@/components/admin/UsuarioModal';
-import { authApi } from '@/utils/apiAdapter';
+import { authApi, LoginResult } from '@/utils/apiAdapter';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -42,61 +42,65 @@ export default function LoginPage() {
     setIsLoading(true);
     setMensaje(null);
 
-    try {
-      // Usar el adaptador para la nueva API ASP.NET
-      const authResponse = await authApi.login(email, password);
-      
-      // El adaptador ya mapea la respuesta al formato esperado
-      await login(authResponse.token, authResponse.user);
+    // Usar el nuevo patrón sin excepciones
+    const loginResult = await authApi.login(email, password);
+    
+    if (loginResult.success) {
+      // Login exitoso
+      await login(loginResult.data.token, loginResult.data.user);
       setMensaje('Inicio de sesión exitoso');
       setTipoMensaje('exito');
       
-      const userRole = authResponse.user.role;
+      const userRole = loginResult.data.user.role;
       setTimeout(() => {
         router.push('/'); // Todos los usuarios van a la página principal
       }, 1000);
-    } catch (error: any) {
-      console.error('Error en el inicio de sesión:', error);
-      setMensaje(error.message || 'Error de conexión con el servidor. Por favor, intente nuevamente.');
+    } else {
+      // Login falló - mostrar error sin lanzar excepción
+      console.error('Error en el inicio de sesión:', loginResult.error);
+      setMensaje(loginResult.error);
       setTipoMensaje('error');
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   }
 
-  // Manejo del login con Google - TEMPORALMENTE DESHABILITADO
+  // Manejo del login con Google
   async function handleGoogleLogin(cred: CredentialResponse) {
-    setMensaje('Google Login temporalmente no disponible. Use email y contraseña.');
-    setTipoMensaje('error');
-    
-    /* TODO: Implementar Google OAuth en la API ASP.NET
+    if (!cred.credential) {
+      setMensaje('Error al obtener credenciales de Google');
+      setTipoMensaje('error');
+      return;
+    }
+
+    setIsLoading(true);
+    setMensaje(null);
+
     try {
-      if (!cred.credential) return;
-
-      // Podemos decodificar el id_token si quisiéramos información extra
-
-      // 2. Enviamos el id_token al backend para validarlo / crear usuario
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_AUTH}/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_token: cred.credential }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        await login(data.token, data.user);
-        router.push('/');
+      // Enviar el id_token al backend para validarlo
+      const loginResult = await authApi.googleAuth(cred.credential);
+      
+      if (loginResult.success) {
+        // Login exitoso
+        await login(loginResult.data.token, loginResult.data.user);
+        setMensaje('Inicio de sesión con Google exitoso');
+        setTipoMensaje('exito');
+        
+        setTimeout(() => {
+          router.push('/'); // Redirigir a la página principal
+        }, 1000);
       } else {
-        setMensaje(data.message || 'Error con Google Login');
+        // Login falló
+        setMensaje(loginResult.error);
         setTipoMensaje('error');
       }
     } catch (error: any) {
       console.error('Google login error', error);
       setMensaje('Error interno de Google Login');
       setTipoMensaje('error');
+    } finally {
+      setIsLoading(false);
     }
-    */
   }
 
   return (
@@ -142,6 +146,14 @@ export default function LoginPage() {
                 className="w-full p-3 rounded-md border border-[#B6D5C8] focus:outline-none focus:ring-2 focus:ring-[#436E6C]"
                 required
               />
+              <div className="text-right mt-1">
+                <Link 
+                  href="/recuperar-password"
+                  className="text-xs text-[#436E6C] hover:text-[#5A9A98] transition-colors duration-300 underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
             </div>
 
             <button

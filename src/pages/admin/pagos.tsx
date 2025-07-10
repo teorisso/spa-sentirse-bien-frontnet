@@ -9,6 +9,7 @@ import PageHero from '@/components/PageHero';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { DollarSign, CreditCard, Layers } from 'lucide-react';
+import { paymentApi, turnoApi } from '@/utils/apiAdapter';
 
 export default function AdminPagosPage() {
   // Auth & routing
@@ -32,61 +33,26 @@ export default function AdminPagosPage() {
   useEffect(() => {
     if (!isAuthLoaded || !user || !isAdmin) return;
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('No se encontró token de autenticación');
-      router.replace('/login');
-      return;
-    }
-
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const pagosPromise = fetch(`${process.env.NEXT_PUBLIC_API_PAYMENT}?token=${token}`, {
-          cache: 'no-store',
-        });
-        const turnosPromise = fetch(`${process.env.NEXT_PUBLIC_API_TURNO}?token=${token}`, {
-          cache: 'no-store',
-        });
+        // Usar paymentApi del adapter en lugar de fetch directo
+        const pagosResponse = await paymentApi.getAll({ pageSize: 1000 });
+        const turnosResponse = await turnoApi.getAll({ pageSize: 1000 });
 
-        const [pagosRes, turnosRes] = await Promise.all([pagosPromise, turnosPromise]);
+        // Los datos vienen en la estructura: { data: [...], totalCount, etc. }
+        const pagosData = Array.isArray(pagosResponse) ? pagosResponse : (pagosResponse.data || []);
+        const turnosData = Array.isArray(turnosResponse) ? turnosResponse : (turnosResponse.data || []);
 
-        const pagosJson = await pagosRes.json();
-        let turnosJson = await turnosRes.json();
+        console.log('Pagos obtenidos:', pagosData);
+        console.log('Turnos obtenidos:', turnosData);
 
-        // Enriquecer profesionales si vienen como ID
-        const idsSinPop = turnosJson
-          .filter((t: any) => typeof t.profesional === 'string')
-          .map((t: any) => t.profesional);
-
-        if (idsSinPop.length) {
-          try {
-            const resUsers = await fetch(`${process.env.NEXT_PUBLIC_API_USER}`);
-            if (resUsers.ok) {
-              const usuarios = await resUsers.json();
-              const map: Record<string, any> = {};
-              usuarios.forEach((u: any) => (map[u._id] = u));
-              turnosJson = turnosJson.map((t: any) => {
-                if (typeof t.profesional === 'string' && map[t.profesional]) {
-                  return { ...t, profesional: map[t.profesional] };
-                }
-                return t;
-              });
-            }
-          } catch (err) {
-            console.error('Error enriqueciendo profesionales', err);
-          }
-        }
-
-        if (!pagosRes.ok) throw new Error(pagosJson.message || 'Error al obtener pagos');
-        if (!turnosRes.ok) throw new Error(turnosJson.message || 'Error al obtener turnos');
-
-        setPagos(pagosJson);
-        setTurnos(turnosJson);
+        setPagos(pagosData);
+        setTurnos(turnosData);
       } catch (e: any) {
-        console.error(e);
+        console.error('Error al cargar datos de pagos:', e);
         setError(e.message || 'Error al cargar datos');
         toast.error(e.message || 'Error al cargar datos');
       } finally {
@@ -104,7 +70,7 @@ export default function AdminPagosPage() {
     // Construir mapa de turnos por ID para acceso rápido
     const mapTurnos: Record<string, any> = {};
     turnos.forEach((t: any) => {
-      mapTurnos[t._id] = t;
+      mapTurnos[t._id || t.id] = t;
     });
 
     // Rango de fecha
@@ -114,20 +80,35 @@ export default function AdminPagosPage() {
     const totales: Record<string, { count: number; total: number }> = {};
 
     pagos.forEach((pago) => {
-      const created = new Date(pago.createdAt);
+      // Manejar tanto estructura nueva (created_at) como vieja (createdAt)
+      const created = new Date(pago.createdAt || pago.created_at);
       if (from && created < from) return;
       if (to && created > to) return;
 
-      (pago.turnos || []).forEach((turnoRef: any) => {
-        const turnoId = typeof turnoRef === 'string' ? turnoRef : turnoRef._id;
+      // La nueva estructura tiene turno_id individual, no array de turnos
+      const turnoIds = pago.turnos ? 
+        (Array.isArray(pago.turnos) ? pago.turnos : [pago.turnos]) : 
+        (pago.turnoId || pago.turno_id ? [pago.turnoId || pago.turno_id] : []);
+
+      turnoIds.forEach((turnoRef: any) => {
+        const turnoId = typeof turnoRef === 'string' ? turnoRef : (turnoRef._id || turnoRef.id);
         const turno = mapTurnos[turnoId];
-        if (!turno || !turno.servicio) return;
+        
+        if (!turno) {
+          console.warn('Turno no encontrado para ID:', turnoId);
+          return;
+        }
+
+        // Obtener información del servicio
+        const servicio = turno.servicio || {};
+        const profesional = turno.profesional || {};
 
         const claveAgrupar = groupBy === 'servicio'
-          ? (turno.servicio?.nombre || 'Servicio')
-          : ((turno.profesional?.first_name || '') + ' ' + (turno.profesional?.last_name || '')).trim() || 'Profesional';
+          ? (servicio.nombre || 'Servicio no definido')
+          : ((profesional.first_name || profesional.firstName || '') + ' ' + (profesional.last_name || profesional.lastName || '')).trim() || 'Profesional no definido';
 
-        const precio = turno.servicio?.precio ?? 0;
+        // Usar el monto del pago directamente (nueva estructura)
+        const precio = parseFloat(pago.monto || pago.amount || servicio.precio || 0);
 
         if (!totales[claveAgrupar]) {
           totales[claveAgrupar] = { count: 0, total: 0 };
