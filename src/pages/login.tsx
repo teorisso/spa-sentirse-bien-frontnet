@@ -69,7 +69,7 @@ export default function LoginPage() {
   async function handleGoogleLogin(cred: CredentialResponse) {
     if (!cred.credential) {
       setMensaje('Error al obtener credenciales de Google');
-      setTipoMensaje('error');
+    setTipoMensaje('error');
       return;
     }
 

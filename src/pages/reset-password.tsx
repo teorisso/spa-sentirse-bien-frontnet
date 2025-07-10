@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
     setMensaje(null);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/reset-password`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_AUTH}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
